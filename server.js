@@ -47,27 +47,39 @@ app.post("/api/check", async (req, res) => {
   const { ip } = req.body;
   if (!ip) return res.status(400).json({ error: "IP address required" });
 
-  const { data: existing } = await supabase
-    .from("ips")
-    .select("*")
-    .eq("ip", ip);
-
-  if (existing.length > 0) {
-    await supabase
+  try {
+    const { data: existing, error: selectError } = await supabase
       .from("ips")
-      .update({ duplicate_count: existing[0].duplicate_count + 1 })
+      .select("*")
       .eq("ip", ip);
 
-    return res.json({ status: "duplicate" });
+    if (selectError) {
+      console.error("Select Error:", selectError);
+      return res.status(500).json({ error: "Database select failed" });
+    }
+
+    if (existing && existing.length > 0) {
+      const { error: updateError } = await supabase
+        .from("ips")
+        .update({ duplicate_count: existing[0].duplicate_count + 1 })
+        .eq("ip", ip);
+
+      if (updateError) console.error("Update Error:", updateError);
+      return res.json({ status: "duplicate" });
+    }
+
+    const { error: insertError } = await supabase.from("ips").insert([{ ip }]);
+
+    if (insertError) {
+      console.error("Insert Error:", insertError);
+      return res.status(500).json({ error: "Insert failed" });
+    }
+
+    res.json({ status: "added" });
+  } catch (err) {
+    console.error("General Error:", err);
+    res.status(500).json({ error: "Unexpected error" });
   }
-
-  await supabase.from("ips").insert([{ ip }]);
-  res.json({ status: "added" });
-});
-
-// Serve frontend for all other routes
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // ✅ Port for local dev or Vercel
