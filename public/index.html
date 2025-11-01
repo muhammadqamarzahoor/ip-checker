@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IP Checker Database — Live</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>1st Department - <span class="live">Live</span></h1>
+      <!-- <p class="subtitle">Clickora-C3</p> -->
+
+      <section class="card">
+        <div class="status">
+          <span class="dot"></span> Live and synced
+          <span class="timezone"
+            >Asia/Karachi • Resets 6:00 AM • Next in
+            <span id="countdown">--:--:--</span></span
+          >
+        </div>
+
+        <div class="date-display">Today: <span id="today"></span></div>
+
+        <div class="input-row">
+          <input type="text" id="ipInput" placeholder="e.g. 203.0.113.45 " />
+          <button id="checkBtn">Check & Add</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <h3>Successful IPs (30 days)</h3>
+            <p id="successCount">0</p>
+          </div>
+          <div class="stat">
+            <h3>Duplicate IPs (today)</h3>
+            <p id="duplicateCount">0</p>
+          </div>
+        </div>
+
+        <p class="privacy">
+          Privacy note: Successful IPs are stored for 30 days. Duplicate counts
+          reset daily at 6:00 AM (Asia/Karachi).
+        </p>
+      </section>
+
+      <footer>
+        <p>Created by Ghulam Yasin</p>
+      </footer>
+    </main>
+
+    <!-- Notification Container -->
+    <div id="notification-container" class="notification-container"></div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
