@@ -1,7 +1,7 @@
 const API_URL =
   window.location.hostname === "localhost"
     ? "http://localhost:3000/api"
-    : "https://ip-checker-1.vercel.app/api";
+    : "https://ip-checker-tau.vercel.app/api";
 
 // Validate IPv4 address
 function isValidIP(ip) {
