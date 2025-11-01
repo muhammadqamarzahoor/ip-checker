@@ -19,7 +19,8 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // Database setup
-const adapter = new JSONFile("db.json");
+const adapter = new JSONFile("/tmp/db.json");
+
 const db = new Low(adapter, { ips: [], duplicates: {}, lastReset: "" });
 await db.read();
 
