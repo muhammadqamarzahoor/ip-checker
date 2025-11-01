@@ -1,15 +1,14 @@
 import express from "express";
-import { Low } from "lowdb";
-import { JSONFile } from "lowdb/node";
 import bodyParser from "body-parser";
 import cors from "cors";
-import { DateTime } from "luxon";
 import path from "path";
+import { DateTime } from "luxon";
 import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 
-// 🧩 Support for ES modules path resolution
+// Path setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -18,65 +17,50 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Database setup
-const adapter = new JSONFile("/tmp/db.json");
+// 🧠 Connect to Supabase (using Environment Variables)
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const db = new Low(adapter, { ips: [], duplicates: {}, lastReset: "" });
-await db.read();
-
-function resetDailyIfNeeded() {
-  const now = DateTime.now().setZone("Asia/Karachi");
-  const resetTime = now.set({ hour: 6, minute: 0, second: 0, millisecond: 0 });
-  const lastReset = db.data.lastReset
-    ? DateTime.fromISO(db.data.lastReset)
-    : null;
-
-  if (!lastReset || (now > resetTime && lastReset < resetTime)) {
-    db.data.duplicates = {};
-    db.data.lastReset = now.toISO();
-    db.write();
-  }
+// 🕒 Helper function: Remove IPs older than 30 days
+async function removeExpiredIPs() {
+  const thirtyDaysAgo = DateTime.now().minus({ days: 30 }).toISO();
+  await supabase.from("ips").delete().lt("created_at", thirtyDaysAgo);
 }
 
-function removeExpiredIPs() {
-  const now = DateTime.now();
-  db.data.ips = db.data.ips.filter((entry) => {
-    const added = DateTime.fromISO(entry.date);
-    return now.diff(added, "days").days <= 30;
-  });
-}
-
-// API routes
+// 📊 API: Stats
 app.get("/api/stats", async (req, res) => {
-  resetDailyIfNeeded();
-  removeExpiredIPs();
-  const successful = db.data.ips.length;
-  const duplicateCount = Object.values(db.data.duplicates).reduce(
-    (a, b) => a + b,
-    0
-  );
+  await removeExpiredIPs();
+
+  const { data: ips } = await supabase.from("ips").select("*");
+  const successful = ips?.length || 0;
+  const duplicateCount = ips?.reduce((a, b) => a + (b.duplicate_count || 0), 0);
+
   res.json({ successful, duplicateCount });
 });
 
+// 🧩 API: Check IP
 app.post("/api/check", async (req, res) => {
   const { ip } = req.body;
   if (!ip) return res.status(400).json({ error: "IP address required" });
 
-  resetDailyIfNeeded();
-  removeExpiredIPs();
+  const { data: existing } = await supabase
+    .from("ips")
+    .select("*")
+    .eq("ip", ip);
 
-  const now = DateTime.now().toISO();
-  const exists = db.data.ips.some((entry) => entry.ip === ip);
+  if (existing.length > 0) {
+    await supabase
+      .from("ips")
+      .update({ duplicate_count: existing[0].duplicate_count + 1 })
+      .eq("ip", ip);
 
-  if (exists) {
-    db.data.duplicates[ip] = (db.data.duplicates[ip] || 0) + 1;
-    await db.write();
-    res.json({ status: "duplicate" });
-  } else {
-    db.data.ips.push({ ip, date: now });
-    await db.write();
-    res.json({ status: "added" });
+    return res.json({ status: "duplicate" });
   }
+
+  await supabase.from("ips").insert([{ ip }]);
+  res.json({ status: "added" });
 });
 
 // Serve frontend for all other routes
@@ -84,15 +68,14 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ✅ Correct port handling for both local & Vercel
+// ✅ Port for local dev or Vercel
 const PORT = process.env.PORT || 3000;
 
-// Start server locally
 if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, () =>
     console.log(`✅ Server running at http://localhost:${PORT}`)
   );
 }
 
-// ✅ Export app for Vercel serverless function
+// Export for Vercel
 export default app;
